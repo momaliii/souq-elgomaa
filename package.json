@@ -5,6 +5,7 @@
   "description": "سوق الجمعة - لعبة خصم خفي أونلاين",
   "main": "server.js",
   "scripts": {
+    "build": "echo \"مفيش build - اللعبة جاهزة\"",
     "start": "node server.js"
   },
   "dependencies": {
