@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#16110d">
+  <title>سوق الجمعة</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <button id="mute" class="icon-btn" title="الصوت (M)">🔊</button>
+
+  <!-- الشاشة الرئيسية -->
+  <section id="home" class="screen active">
+    <div class="home-grid">
+      <div class="panel hero">
+        <div class="logo">🪙</div>
+        <h1>سوق الجمعة</h1>
+        <p class="tag">لعبة خصم خفي أونلاين.. وسطكم واحد بيلعب ضدكم، اكشفوه قبل ما يكسب</p>
+        <label class="field">اسمك<input id="name" maxlength="14" placeholder="مثلاً: عم حسن"></label>
+        <button id="btnCreate" class="primary big">اعمل غرفة</button>
+        <label class="check"><input type="checkbox" id="pubRoom" checked> تظهر في قايمة الغرف المفتوحة</label>
+        <div class="divider"><span>أو</span></div>
+        <div class="row">
+          <input id="code" maxlength="4" placeholder="CODE" dir="ltr">
+          <button id="btnJoin">ادخل بالكود</button>
+        </div>
+        <p class="err" id="homeErr"></p>
+      </div>
+
+      <div class="side-col">
+        <div class="panel">
+          <div class="panel-head"><h3>🚪 غرف مفتوحة</h3><button id="refreshRooms" class="mini" title="تحديث">↻</button></div>
+          <ul id="roomList" class="plist rooms-list"></ul>
+        </div>
+        <div class="modes">
+          <div class="mode-card souq"><span>🏪</span><b>كلاسيك</b><small>مزوّر بيغرّق السوق بفلوس مضروبة</small></div>
+          <div class="mode-card night"><span>🌙</span><b>ليلة السوق</b><small>المزوّر بيضرب.. لاقي حد مرمي؟ بلّغ</small></div>
+          <div class="mode-card office"><span>🏢</span><b>الشركة</b><small>موظفين وقاتل، كاميرات ومخابئ سرية</small></div>
+        </div>
+        <details class="panel rules">
+          <summary>📖 إزاي تلعب؟</summary>
+          <ul>
+            <li><b>التاجر 🧺:</b> اشتري الحاجات اللي في ليستتك. كل حاجة بـ 2 جنيه والبياع بيرجعلك باقي من الدرج.. والباقي ممكن يكون <b>مضروب</b>! الصرّاف 💱 بيكشف محفظتك.</li>
+            <li><b>الكشاف 🔦:</b> اقف جنب بسطة 3 ثواني: تعرف كام ورقة مضروبة في الدرج، وآخر واحدة دخلت إمتى، ومين اشترى قريب.</li>
+            <li><b>الفصال 🤝:</b> قبل الشراء دوس E والمؤشر في الأخضر، والبياع يرجعلك باقي زيادة.</li>
+            <li><b>المزوّر 🖨️:</b> بيطبع ورق مضروب، يدسّه 🤫 في الجيوب، يقطع الكهربا ⚡، ويقفل البسط 🔒.</li>
+            <li><b>أدوار خاصة:</b> أمين الشرطة 👮 بيفتّش جيب، الشحات 🪙 بيلاحظ، والحرامي 🦹 بينشل ويكسب لوحده.</li>
+            <li><b>🌙 ليلة السوق:</b> المزوّر يضرب (K) واللي يلاقي حد مرمي يبلّغ (R).</li>
+            <li><b>🏢 الشركة:</b> موظفين بيعملوا مهام، وقاتل بيضرب ويستخبى في الدواليب (V) ويطلع من مكان تاني. غرفة كاميرات 📹، و<b>الأمن</b> يفتحها من أي مكان (X).</li>
+            <li><b>الاجتماع 📣:</b> كل لاعب ينادي مرة. تتناقشوا وتصوّتوا، واللي يتطرد يبقى شبح 👻.</li>
+          </ul>
+          <div class="keys">
+            <span><kbd>WASD</kbd> مشي</span><span><kbd>E</kbd> استخدام</span><span><kbd>I</kbd> كشف</span><span><kbd>Q</kbd> طباعة</span>
+            <span><kbd>F</kbd> دسّ</span><span><kbd>B</kbd> كهربا</span><span><kbd>C</kbd> قفل</span><span><kbd>K</kbd> ضرب</span>
+            <span><kbd>R</kbd> بلاغ</span><span><kbd>V</kbd> استخباية</span><span><kbd>X</kbd> كاميرات</span><span><kbd>T</kbd> تفتيش</span>
+            <span><kbd>G</kbd> نشل</span><span><kbd>1-5</kbd> إيموشن</span><span><kbd>M</kbd> الصوت</span>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- اللوبي -->
+  <section id="lobby" class="screen">
+    <div class="lobby-grid">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>الغرفة <span id="roomCode" dir="ltr" class="code"></span></h2>
+          <button id="copyCode" class="mini">🔗 نسخ اللينك</button>
+        </div>
+        <p class="muted">ابعت الكود لصحابك · من 4 لـ 10 لاعبين</p>
+        <ul id="lobbyList" class="plist player-grid"></ul>
+        <div id="hostCtrls" class="row">
+          <button id="btnBot">🤖 ضيف بوت</button>
+          <button id="btnStart" class="primary big">ابدأ</button>
+        </div>
+        <p class="muted center" id="waitHost">⏳ مستنيين صاحب الغرفة يبدأ…</p>
+        <p class="err" id="lobbyErr"></p>
+      </div>
+
+      <div class="side-col">
+        <div class="panel look">
+          <h3>🎨 شكلك</h3>
+          <div id="hatPick" class="pick"></div>
+          <div id="colorPick" class="pick"></div>
+        </div>
+        <div id="settings" class="panel settings">
+          <h3>⚙️ إعدادات الدور</h3>
+          <div class="group">
+            <label>المود
+              <select id="sMode"><option value="classic">🏪 كلاسيك</option><option value="night">🌙 ليلة السوق (ضرب وبلاغ)</option><option value="office">🏢 الشركة (ضرب وكاميرات ومخابئ)</option></select>
+            </label>
+            <label>الخريطة
+              <select id="sMap"><option value="souq">🏪 سوق الجمعة</option><option value="sea">🐟 سوق السمك (إسكندرية)</option><option value="office" disabled>🏢 الشركة</option></select>
+            </label>
+          </div>
+          <div class="group three">
+            <label>عدد الخصوم
+              <select id="sFakers"><option value="0">أوتوماتيك</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+            </label>
+            <label class="only-souq">المزوّر يكسب عند
+              <select id="sTarget"><option>6</option><option>8</option><option>10</option><option>12</option><option>14</option></select>
+            </label>
+            <label><span id="listLbl">حاجات الليستة</span>
+              <select id="sList"><option>3</option><option>4</option><option>5</option><option>6</option></select>
+            </label>
+          </div>
+          <div class="group toggles">
+            <label class="check"><input type="checkbox" id="sSpecials"> أدوار خاصة</label>
+            <label class="check only-souq"><input type="checkbox" id="sThief"> حرامي (6+)</label>
+            <label class="check"><input type="checkbox" id="sReveal"> كشف دور المطرود</label>
+            <label class="check"><input type="checkbox" id="sPublic"> غرفة مفتوحة</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- اللعب -->
+  <section id="game" class="screen">
+    <canvas id="cv"></canvas>
+    <div id="topbar">
+      <div id="roleTag"></div>
+      <div class="meter fake"><span>ورق مضروب</span><div class="bar"><i id="circBar"></i></div><b id="circTxt"></b></div>
+      <div class="meter prog"><span id="progLbl">مشتريات التجار</span><div class="bar"><i id="progBar"></i></div><b id="progTxt"></b></div>
+    </div>
+    <div id="blackoutBanner" class="hidden">⚡ الكهربا قاطعة! روح صلّحها · <b id="boLeft"></b></div>
+    <div id="side">
+      <div class="side-head"><b id="listTitle">📋 ليستتك</b><span class="wallet">💰 <b id="coins">0</b> <span id="fakes"></span></span></div>
+      <ul id="shopList"></ul>
+      <div id="meetLeft" class="muted small"></div>
+    </div>
+    <canvas id="mini"></canvas>
+    <div id="ghostTag" class="hidden">👻 انت شبح دلوقتي.. محدش شايفك، بس تقدر تكمّل شغلك</div>
+    <div id="hint" class="hidden"></div>
+    <div id="inspBar" class="hidden"><span>🔦 بتكشف على الدرج…</span><div class="bar"><i id="inspFill"></i></div></div>
+    <div id="joy"><div id="knob"></div></div>
+    <div id="actions">
+      <button id="aUse" class="act main" data-key="E">✋<small>استخدام</small></button>
+      <button id="aInspect" class="act" data-key="I">🔦<small>كشف</small></button>
+      <button id="aPrint" class="act faker" data-key="Q">🖨️<small>اطبع</small></button>
+      <button id="aPlant" class="act faker" data-key="F">🤫<small>دسّ</small></button>
+      <button id="aBlackout" class="act faker" data-key="B">⚡<small>اقطع</small></button>
+      <button id="aClose" class="act faker" data-key="C">🔒<small>اقفل</small></button>
+      <button id="aSearch" class="act police hidden" data-key="T">👮<small>فتّش</small></button>
+      <button id="aSteal" class="act thief hidden" data-key="G">🦹<small>انشل</small></button>
+      <button id="aKill" class="act danger hidden" data-key="K">💥<small>اضرب</small></button>
+      <button id="aReport" class="act hidden" data-key="R">📢<small>بلّغ</small></button>
+      <button id="aCams" class="act hidden" data-key="X">📹<small>كاميرات</small></button>
+      <button id="aHide" class="act hidden" data-key="V">🚪<small>استخبى</small></button>
+    </div>
+    <div id="emotes"></div>
+    <div id="toasts"></div>
+    <div id="camBar" class="hidden"><span></span><button>✕ اقفل الكاميرات</button></div>
+    <div id="hidePanel" class="hidden"></div>
+  </section>
+
+  <!-- الاجتماع -->
+  <div id="meeting" class="overlay hidden">
+    <div class="panel meet">
+      <div class="mhead">
+        <div>
+          <h2>📣 اجتماع</h2>
+          <p class="muted" id="mSub"></p>
+        </div>
+        <div class="timer" id="mTimer"></div>
+      </div>
+      <div id="mResult" class="result hidden"></div>
+      <div class="meet-grid">
+        <div class="meet-votes">
+          <div id="mPlayers" class="vgrid"></div>
+          <button id="mSkip">سكيب ⏭</button>
+        </div>
+        <div class="chat">
+          <div id="mChat" class="log"></div>
+          <div id="quick"></div>
+          <form id="chatForm" class="row"><input id="chatIn" maxlength="120" placeholder="اكتب حاجة…"><button class="primary">ابعت</button></form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- النهاية -->
+  <div id="end" class="overlay hidden">
+    <div class="panel endcard">
+      <div id="endIcon" class="logo"></div>
+      <h2 id="endTitle"></h2>
+      <p id="endWhy" class="muted"></p>
+      <div id="awards"></div>
+      <ul id="endList" class="plist player-grid"></ul>
+      <button id="btnAgain" class="primary big">العب تاني</button>
+      <p class="muted center" id="endWait">⏳ مستنيين صاحب الغرفة…</p>
+    </div>
+  </div>
+
+  <!-- الفصال -->
+  <div id="haggle" class="overlay hidden">
+    <div class="panel haggle">
+      <h2>🤝 فاصل مع البياع</h2>
+      <div id="hgItem" class="hg-item"></div>
+      <div class="hg-bar"><div id="hgZone"></div><div id="hgNeedle"></div></div>
+      <p id="hgMsg" class="muted"></p>
+    </div>
+  </div>
+
+  <!-- كارت الدور في البداية -->
+  <div id="roleCard" class="overlay hidden"><div class="panel rolecard"><div id="roleIcon" class="logo"></div><div id="roleBig"></div><p id="roleDesc"></p></div></div>
+
+  <script src="/client.js"></script>
+</body>
+</html>
