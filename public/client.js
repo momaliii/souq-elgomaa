@@ -5,7 +5,7 @@ const COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22'
 const HAT_ICONS = { tarboosh: '🎩', cap: '🧢', scarf: '🧕', bald: '👨‍🦲', shawl: '👳' };
 
 let ws, you, hostId, quick = [];
-let MAP, CFG, role, special = null, mates = [], fakeTarget = 8, night = false, camsOpen = false, office = false;
+let MAP, CFG, role, special = null, mates = [], fakeTarget = 8, night = false, camsOpen = false, office = false, thiefMode = false, thiefGoal = 8;
 let state = null, prevPos = new Map(), curPos = new Map(), lastStateAt = 0;
 let meetingOpen = false, lobbyPlayers = [];
 
@@ -179,6 +179,7 @@ function onLobby(m) {
   $('sFakers').value = m.settings.fakers; $('sTarget').value = m.settings.fakeTarget; $('sList').value = m.settings.listSize;
   $('sReveal').checked = m.settings.reveal; $('sPublic').checked = m.public; $('sSpecials').checked = m.settings.specials; $('sThief').checked = m.settings.thief; $('sMap').value = m.settings.map; $('sMode').value = m.settings.mode || 'classic'; $('sMap').disabled = m.settings.mode === 'office';
   $('settings').classList.toggle('office-mode', m.settings.mode === 'office');
+  $('settings').classList.toggle('thief-mode', m.settings.mode === 'thief');
   $('listLbl').textContent = m.settings.mode === 'office' ? 'عدد المهام' : 'حاجات الليستة';
   $('lobbyList').innerHTML = '';
   for (const p of m.players) {
@@ -219,7 +220,7 @@ function renderLook() {
 
 // ---------- بداية الدور ----------
 function onStart(m) {
-  MAP = m.map; CFG = m.cfg; role = m.role; special = m.special; mates = m.mates; fakeTarget = m.fakeTarget; night = !!m.night; office = !!m.office;
+  MAP = m.map; CFG = m.cfg; role = m.role; special = m.special; mates = m.mates; fakeTarget = m.fakeTarget; night = !!m.night; office = !!m.office; thiefMode = !!m.thiefMode; thiefGoal = m.thiefGoal;
   if (m.quick) { quick = m.quick; renderQuick(); }
   document.body.classList.toggle('office', office);
   $('progLbl').textContent = office ? 'مهام الموظفين' : 'مشتريات التجار';
@@ -259,6 +260,20 @@ function onStart(m) {
     setTimeout(() => $('roleCard').classList.add('hidden'), 4500);
     return;
   }
+  $('circLbl').textContent = thiefMode ? '🦹 فلوس مسروقة' : 'ورق مضروب';
+  document.body.classList.toggle('thiefmode', thiefMode);
+  if (thiefMode) {
+    // مود الحرامي: مفيش مزوّر ولا مضروب، حرامي وسط التجار
+    const pol = special === 'police' ? ' · 👮 وانت أمين الشرطة: تقدر تفتّش جيب واحد (T) وتعرف معاه كام جنيه.. الحرامي جيبه تقيل!' : special === 'watcher' ? ' · 🪙 وانت الشحات: لو حد نشل جنبك هتشوفه بعينك.' : '';
+    $('roleTag').textContent = isT ? '🦹 انت الحرامي' : sp && !isT ? `${sp[0]} ${sp[1]}` : '🧺 انت تاجر';
+    $('roleDesc').textContent = isT
+      ? `انشل من جيوب الناس (G) من غير ما حد ياخد باله. لمّوا ${thiefGoal} جنيه وتهربوا. الضحية بتحس بعد كام ثانية، فابعد قبلها واعمل نفسك بتشتري.${m.mates2 && m.mates2.length ? ' زميلك: ' + m.mates2.join('، ') : ''}`
+      : `فيه حرامي بينشل وسطكم! خلّص ليستتك، خلي عينك على اللي بيلزق في الناس، ولما حد يتنشل اتجمعوا عند المعلم (E) واطردوا الحرامي.${pol}`;
+    if (m.rejoin) { toast('🔌 رجعت للسوق', 'info'); return; }
+    $('roleCard').classList.remove('hidden');
+    setTimeout(() => $('roleCard').classList.add('hidden'), 4500);
+    return;
+  }
   $('roleDesc').textContent = isF
     ? `اطبع ورق مضروب وادفع بيه، دسّه في جيوب التجار، واقطع الكهربا واقفل البسط. غرّق السوق بـ ${fakeTarget} ورقات قبل ما يكشفوك.${mates.length ? ' شريكك: ' + mates.join('، ') : ''}`
     : sp ? sp[2] : `اشتري حاجات ليستتك، واكشف أدراج البسط، واعرف مين المزوّر من بين ${m.nFake > 1 ? m.nFake + ' مزوّرين' : 'التجار'}.`;
@@ -282,7 +297,7 @@ function onState(m) {
   $('progBar').style.width = Math.round(m.prog * 100) + '%';
   $('progTxt').textContent = Math.round(m.prog * 100) + '%';
   $('coins').textContent = me.coins;
-  $('fakes').textContent = me.fakes !== undefined ? `(${me.fakes} مضروب)` : me.loot !== undefined ? `· 🦹 سرقت ${me.loot}/${CFG.thiefGoal}` : '';
+  $('fakes').textContent = me.fakes !== undefined ? `(${me.fakes} مضروب)` : me.loot !== undefined ? `· 🦹 سرقت ${me.loot}` + (thiefMode ? ` (الكل ${m.circ}/${thiefGoal})` : `/${thiefGoal}`) : '';
   $('shopList').innerHTML = me.list.map((i) => {
     const s = MAP.stalls[i];
     return `<li class="${me.bought.includes(i) ? 'done' : ''}">${s.icon} ${office ? s.task : s.item}</li>`;
@@ -352,7 +367,7 @@ function updateButtons(me) {
   $('aUse').querySelector('small').textContent = label;
   $('hint').classList.toggle('hidden', !hint);
   $('hint').textContent = hint;
-  $('aInspect').classList.toggle('hidden', !me.alive || office);
+  $('aInspect').classList.toggle('hidden', !me.alive || office || thiefMode);
   $('aInspect').classList.toggle('on', k === 'stall' && !me.cd.inspect);
   setCd($('aInspect'), me.cd.inspect);
   if (role === 'thief') {
@@ -1217,7 +1232,7 @@ function onEnd(m) {
   const T = office ? { faker: '🔪 القاتل كسب', trader: '💼 الموظفين كسبوا' } : { faker: '🖨️ المزوّر كسب', trader: '🧺 التجار كسبوا', thief: '🦹 الحرامي كسب' };
   $('endTitle').textContent = T[m.winner] + (won ? ' — مبروك!' : ' — حظ أوفر');
   $('endTitle').style.color = m.winner === 'faker' ? 'var(--red)' : m.winner === 'thief' ? '#b388ff' : 'var(--gold)';
-  $('endWhy').textContent = office ? `${m.why} · المهام ${Math.round(m.prog * 100)}%` : `${m.why} · ورق مضروب ${m.circ}/${fakeTarget} · مشتريات ${Math.round(m.prog * 100)}%`;
+  $('endWhy').textContent = m.thiefMode ? `${m.why} · مسروق ${m.circ}/${thiefGoal} · مشتريات ${Math.round(m.prog * 100)}%` : office ? `${m.why} · المهام ${Math.round(m.prog * 100)}%` : `${m.why} · ورق مضروب ${m.circ}/${fakeTarget} · مشتريات ${Math.round(m.prog * 100)}%`;
   $('awards').innerHTML = '';
   for (const a of m.awards || []) {
     const d = document.createElement('div'); d.className = 'award';

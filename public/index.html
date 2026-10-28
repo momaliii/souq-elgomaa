@@ -39,6 +39,7 @@
           <div class="mode-card souq"><span>🏪</span><b>كلاسيك</b><small>مزوّر بيغرّق السوق بفلوس مضروبة</small></div>
           <div class="mode-card night"><span>🌙</span><b>ليلة السوق</b><small>المزوّر بيضرب.. لاقي حد مرمي؟ بلّغ</small></div>
           <div class="mode-card office"><span>🏢</span><b>الشركة</b><small>موظفين وقاتل، كاميرات ومخابئ سرية</small></div>
+          <div class="mode-card thief"><span>🦹</span><b>مين الحرامي؟</b><small>حرامي بينشل الجيوب.. اكشفوه قبل ما يهرب</small></div>
         </div>
         <details class="panel rules">
           <summary>📖 إزاي تلعب؟</summary>
@@ -91,17 +92,17 @@
           <h3>⚙️ إعدادات الدور</h3>
           <div class="group">
             <label>المود
-              <select id="sMode"><option value="classic">🏪 كلاسيك</option><option value="night">🌙 ليلة السوق (ضرب وبلاغ)</option><option value="office">🏢 الشركة (ضرب وكاميرات ومخابئ)</option></select>
+              <select id="sMode"><option value="classic">🏪 كلاسيك</option><option value="night">🌙 ليلة السوق (ضرب وبلاغ)</option><option value="office">🏢 الشركة (ضرب وكاميرات ومخابئ)</option><option value="thief">🦹 مين الحرامي؟ (نشل وتحقيق)</option></select>
             </label>
             <label>الخريطة
               <select id="sMap"><option value="souq">🏪 سوق الجمعة</option><option value="sea">🐟 سوق السمك (إسكندرية)</option><option value="office" disabled>🏢 الشركة</option></select>
             </label>
           </div>
           <div class="group three">
-            <label>عدد الخصوم
+            <label class="no-thief">عدد الخصوم
               <select id="sFakers"><option value="0">أوتوماتيك</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
             </label>
-            <label class="only-souq">المزوّر يكسب عند
+            <label class="only-souq no-thief">المزوّر يكسب عند
               <select id="sTarget"><option>6</option><option>8</option><option>10</option><option>12</option><option>14</option></select>
             </label>
             <label><span id="listLbl">حاجات الليستة</span>
@@ -110,7 +111,7 @@
           </div>
           <div class="group toggles">
             <label class="check"><input type="checkbox" id="sSpecials"> أدوار خاصة</label>
-            <label class="check only-souq"><input type="checkbox" id="sThief"> حرامي (6+)</label>
+            <label class="check only-souq no-thief"><input type="checkbox" id="sThief"> حرامي (6+)</label>
             <label class="check"><input type="checkbox" id="sReveal"> كشف دور المطرود</label>
             <label class="check"><input type="checkbox" id="sPublic"> غرفة مفتوحة</label>
           </div>
@@ -124,7 +125,7 @@
     <canvas id="cv"></canvas>
     <div id="topbar">
       <div id="roleTag"></div>
-      <div class="meter fake"><span>ورق مضروب</span><div class="bar"><i id="circBar"></i></div><b id="circTxt"></b></div>
+      <div class="meter fake"><span id="circLbl">ورق مضروب</span><div class="bar"><i id="circBar"></i></div><b id="circTxt"></b></div>
       <div class="meter prog"><span id="progLbl">مشتريات التجار</span><div class="bar"><i id="progBar"></i></div><b id="progTxt"></b></div>
     </div>
     <div id="blackoutBanner" class="hidden">⚡ الكهربا قاطعة! روح صلّحها · <b id="boLeft"></b></div>
