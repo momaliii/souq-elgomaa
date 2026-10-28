@@ -268,7 +268,7 @@ body:has(#camBar:not(.hidden)) #topbar, body:has(#camBar:not(.hidden)) #side, bo
 body:has(#camBar:not(.hidden)) #actions, body:has(#camBar:not(.hidden)) #emotes, body:has(#camBar:not(.hidden)) #hint { display: none; }
 
 /* الشركة: مفيش فلوس */
-body.office #topbar .meter.fake, body.office .wallet, body.office #aPrint, body.office #aPlant { display: none !important; }
+body.office:not(.thiefmode) #topbar .meter.fake, body.office .wallet, body.office #aPrint, body.office #aPlant { display: none !important; }
 
 /* مؤثرات */
 .flash { position: fixed; inset: 0; pointer-events: none; z-index: 30; opacity: .45; animation: flash .6s forwards; }

@@ -181,7 +181,7 @@ const CFG = {
   radius: 16,
   reach: 72,
   startCoins: 6,
-  price: 2,
+  price: 3,
   printCd: 9,
   plantCd: 25,
   inspectTime: 3,
@@ -206,6 +206,10 @@ const CFG = {
   stealReach: 55,
   thiefGoal: 8,
   thiefModeGoal: 12,
+  safeTime: 5,
+  safeLoot: 2,
+  safeGoal: 8,
+  safeCd: 25,
   buyerWindow: 45,
   vision: 320,
   darkVision: 110,
@@ -311,7 +315,8 @@ function startGame(room) {
   room.night = room.settings.mode === 'night' || room.settings.mode === 'office';
   room.office = MAP.theme === 'office';
   room.thiefMode = thiefMode;
-  room.thiefGoal = thiefMode ? CFG.thiefModeGoal : CFG.thiefGoal;
+  room.acc = (MAP.rooms || []).find((r) => r.name === 'الحسابات');
+  room.thiefGoal = thiefMode ? (room.office ? CFG.safeGoal : CFG.thiefModeGoal) : CFG.thiefGoal;
   // كل مزوّر زيادة بيرفع الهدف عشان اللعبة تفضل متوازنة
   room.target = room.settings.fakeTarget + 4 * (nFake - 1);
   room.startedAt = now();
@@ -331,6 +336,7 @@ function startGame(room) {
     p.loot = 0;
     if (room.settings.mode === 'night') p.cd.kill = now() + 25;
     p.searchLeft = 0;
+    p.inAcc = 0;
     spawn(p, i, ps.length);
   });
   // أدوار خاصة للتجار: أمين الشرطة من 5 لاعبين، والشحات من 6
@@ -348,7 +354,7 @@ function startGame(room) {
   // مود الحرامي: حرامي واحد (اتنين من 8 لاعبين) وسط التجار
   if (thiefMode) {
     const n = ps.length >= 8 ? 2 : 1;
-    shuffle(ps.filter((p) => p.role === 'trader' && !p.special)).slice(0, n).forEach((t) => { t.role = 'thief'; t.cd.steal = now() + 12; });
+    shuffle(ps.filter((p) => p.role === 'trader' && !p.special)).slice(0, n).forEach((t) => { t.role = 'thief'; t.cd.steal = now() + (room.office ? 18 : 12); });
   } else if (room.settings.thief && ps.length >= 6 && !room.office) {
     // الحرامي: دور تالت لوحده، من 6 لاعبين
     const t = shuffle(ps.filter((p) => p.role === 'trader' && !p.special))[0];
@@ -439,10 +445,11 @@ function checkWin(room) {
   if (room.thiefMode) {
     const thieves = alive.filter((p) => p.role === 'thief');
     const loot = [...room.players.values()].reduce((n, p) => n + (p.role === 'thief' ? p.loot : 0), 0);
-    if (loot >= room.thiefGoal) { w = 'thief'; why = `الحرامي لمّ ${loot} جنيه من جيوب الناس وهرب! 🏃‍♂️💨`; }
-    else if (!thieves.length) { w = 'trader'; why = 'التجار مسكوا الحرامي 🚔'; }
-    else if (thieves.length >= alive.length - thieves.length) { w = 'thief'; why = 'التجار طردوا بعض والحرامي فضل لوحده معاهم'; }
-    else if (progress(room) >= 1) { w = 'trader'; why = 'التجار خلّصوا مشترياتهم قبل ما الحرامي يلم فلوسه'; }
+    const O = room.office;
+    if (loot >= room.thiefGoal) { w = 'thief'; why = O ? `الحرامي فضّى ${loot} جنيه من الخزنة وهرب! 🏃‍♂️💨` : `الحرامي لمّ ${loot} جنيه من جيوب الناس وهرب! 🏃‍♂️💨`; }
+    else if (!thieves.length) { w = 'trader'; why = O ? 'الموظفين مسكوا حرامي الخزنة 🚔' : 'التجار مسكوا الحرامي 🚔'; }
+    else if (thieves.length >= alive.length - thieves.length) { w = 'thief'; why = O ? 'الموظفين رفدوا بعض والحرامي فضل لوحده معاهم' : 'التجار طردوا بعض والحرامي فضل لوحده معاهم'; }
+    else if (progress(room) >= 1) { w = 'trader'; why = O ? 'الموظفين خلّصوا كل المهام قبل ما الخزنة تفضى' : 'التجار خلّصوا مشترياتهم قبل ما الحرامي يلم فلوسه'; }
     if (w) endGame(room, w, why);
     return;
   }
@@ -505,7 +512,10 @@ function doUse(room, p) {
     p.meetingsLeft--;
     return startMeeting(room, p);
   }
-  if (room.office && near(p, MAP.changer)) return toast(p, 'الخزنة مقفولة بالكود 🔐');
+  if (room.office && near(p, MAP.changer)) {
+    if (room.thiefMode && p.role === 'thief') return doSteal(room, p);
+    return toast(p, 'الخزنة مقفولة بالكود 🔐');
+  }
   if (near(p, MAP.changer)) {
     if (!ready(p, 'changer')) return toast(p, `الصرّاف مشغول.. استنى ${cdLeft(p, 'changer')} ثانية`);
     p.cd.changer = now() + CFG.changerCd;
@@ -517,7 +527,7 @@ function doUse(room, p) {
       msg = fakes ? `الصرّاف لقى ${fakes} ورقة مضروبة في محفظتك واتصادرت!` : 'محفظتك نضيفة، مفيش ولا ورقة مضروبة';
       if (fakes) kind = 'warn';
     }
-    if (p.wallet.length < CFG.price) { p.wallet.push(false, false, false); msg += ' · وسلّفك 3 جنيه'; }
+    if (p.wallet.length < CFG.price) { p.wallet.push(false, false, false, false); msg += ' · وسلّفك 4 جنيه'; }
     fx(p, 'coin');
     return toast(p, msg, kind);
   }
@@ -558,7 +568,7 @@ function buy(room, p, s, good) {
   bump(room, p, 'bought');
   if (good) bump(room, p, 'haggled');
   fx(p, 'coin');
-  toast(p, good ? `🤝 فاصلت صح! اشتريت ${s.icon} ${s.item} وخدت ${nChange} جنيه باقي` : `اشتريت ${s.icon} ${s.item} وخدت جنيه باقي`);
+  toast(p, good ? `🤝 فاصلت صح! اشتريت ${s.icon} ${s.item} بـ ${CFG.price - nChange} جنيه بس` : `اشتريت ${s.icon} ${s.item} بـ ${CFG.price - nChange} جنيه · فاصل المرة الجاية توفّر`);
   checkWin(room);
 }
 
@@ -753,9 +763,63 @@ function doSearch(room, p) {
   if (target.bot) addSus(target, p.id, 0.5);
 }
 
+// اللي في نفس المكان وشايفين الخزنة بعينهم
+function seeSafe(room, p, text) {
+  for (const w of room.players.values()) {
+    if (w === p || !w.alive || w.role === 'thief' || w.special === 'watcher' || w.hidden != null) continue;
+    if (Math.hypot(w.x - p.x, w.y - p.y) > CFG.vision * 0.8 || wallBetween(w.x, w.y, p.x, p.y)) continue;
+    toast(w, text, 'warn');
+    fx(w, 'alert');
+    if (w.bot) { addSus(w, p.id, 6, text.replace('👀 ', '')); botEmote(room, w, '😳'); }
+  }
+}
+function finishSafe(room, p) {
+  p.inspecting = null;
+  p.cd.steal = now() + CFG.safeCd;
+  const got = CFG.safeLoot;
+  p.loot += got;
+  room.thefts = (room.thefts || 0) + 1;
+  bump(room, p, 'stolen', got);
+  fx(p, 'steal');
+  const total = [...room.players.values()].reduce((n, q) => n + (q.role === 'thief' ? q.loot : 0), 0);
+  if (p.bot) botFlee(room, p);
+  toast(p, `💰 فتحت الخزنة وخدت ${got} جنيه! · المسروق ${total}/${room.thiefGoal} · اهرب قبل ما الإنذار يضرب`);
+  const at = now();
+  clearAlibis(room, p.x, p.y, at, 'سرقة الخزنة');
+  setTimeout(() => {
+    if (room.phase !== 'playing' && room.phase !== 'meeting') return;
+    useMap(room);
+    fxAll(room, 'alert');
+    broadcast(room, { t: 'toast', text: `🚨 إنذار الخزنة! حد سرق ${got} جنيه من الحسابات (المسروق ${total}/${room.thiefGoal})`, kind: 'warn' });
+    // كاميرا الطرقة سجّلت اللي دخلوا الحسابات قبل السرقة، بس الصورة مش دايماً واضحة
+    const rec = shuffle([...room.players.values()].filter((q) => q.alive && q.inAcc && at - q.inAcc < 25 && Math.random() < 0.45)).slice(0, 3);
+    if (rec.length) {
+      broadcast(room, { t: 'toast', text: `📹 تسجيل كاميرا الطرقة: ${rec.map((q) => q.name).join(' و')} ${rec.length > 1 ? 'دخلوا' : 'دخل'} الحسابات قبل الإنذار بشوية`, kind: 'warn' });
+      for (const b of room.players.values()) if (b.bot && b.alive && b.role === 'trader') for (const q of rec) if (q !== b) addSus(b, q.id, 1 / rec.length + 0.6, `كاميرا الطرقة سجّلت ${q.name} داخل الحسابات قبل ما الخزنة تتسرق`);
+    }
+    // البوتات بتشك في اللي شافوهم جنب الحسابات وقت السرقة
+    const acc = (MAP.rooms || []).find((r) => r.name === 'الحسابات');
+    for (const b of room.players.values()) {
+      if (!b.bot || !b.alive || b.role === 'thief') continue;
+      const near = new Set(b.ai.seen.filter((e) => Math.abs(e.t - at) < 12 && (Math.hypot(e.x - MAP.changer.x, e.y - MAP.changer.y) < 260 || (acc && e.x < acc.x + acc.w + 40 && e.y > acc.y - 40))).map((e) => e.id));
+      for (const id of near) { const q = room.players.get(id); if (q && q !== b) addSus(b, id, 2.5, `الخزنة اتسرقت، و${q.name} كان جنب الحسابات ساعتها`); }
+    }
+  }, 3000);
+  checkWin(room);
+}
+
 function doSteal(room, p) {
-  if (p.role !== 'thief' || !p.alive || room.phase !== 'playing') return;
+  if (p.role !== 'thief' || !p.alive || room.phase !== 'playing' || p.hidden != null) return;
   if (!ready(p, 'steal')) return toast(p, `إيدك لسه سخنة.. استنى ${cdLeft(p, 'steal')} ثانية`);
+  if (room.office) {
+    // في الشركة: الحرامي بيفتح الخزنة، مفيش جيوب فيها فلوس
+    if (!near(p, MAP.changer)) return toast(p, '💰 روح الخزنة اللي في الحسابات عشان تفتحها');
+    if (p.inspecting) return;
+    p.inspecting = { safe: true, until: now() + CFG.safeTime, total: CFG.safeTime };
+    witness(room, p, `👀 شفت ${p.name} بيعبث في الخزنة!`);
+    seeSafe(room, p, `👀 شفت ${p.name} واقف بيعبث في قفل الخزنة!`);
+    return;
+  }
   let target = null, bd = CFG.stealReach;
   for (const q of room.players.values()) {
     if (q === p || !q.alive || !q.wallet.length) continue;
@@ -777,6 +841,7 @@ function doSteal(room, p) {
   const victimId = target.id, at = now(), where = placeName(target.x, target.y);
   if (room.thiefMode) {
     room.thefts = (room.thefts || 0) + 1;
+    clearAlibis(room, target.x, target.y, at, `ما ${target.name} اتنشل`);
     // اللي واقفين قريب ممكن يحسّوا بزقة، من غير ما يعرفوا مين بالظبط
     for (const w of room.players.values()) {
       if (w === p || w === target || !w.alive || w.role === 'thief' || w.special === 'watcher') continue;
@@ -835,6 +900,7 @@ function doKill(room, p) {
   target.inspecting = null;
   target.haggle = null;
   room.bodies.push({ id: target.id, name: target.name, color: target.color, hat: target.hat, x: target.x, y: target.y, t: now(), by: p.id });
+  clearAlibis(room, target.x, target.y, now(), `ما ${target.name} اتضرب`);
   // المزوّر بيتزق شوية لورا عشان ميبقاش واقف فوق الجثة
   bump(room, p, 'kills');
   fx(p, 'hit'); fx(target, 'hit');
@@ -857,8 +923,9 @@ function puff(room, h, text) {
     }
   }
 }
+function canHide(room, p) { return (room.night && p.role === 'faker') || (room.thiefMode && room.office && p.role === 'thief'); }
 function doHide(room, p) {
-  if (!room.night || p.role !== 'faker' || !p.alive || room.phase !== 'playing') return;
+  if (!canHide(room, p) || !p.alive || room.phase !== 'playing') return;
   if (!ready(p, 'hide')) return;
   p.cd.hide = now() + 1.5;
   if (p.hidden != null) {
@@ -940,7 +1007,7 @@ function startMeeting(room, caller, body = null) {
   }
   room.bodies = [];
   unhideAll(room);
-  for (const p of room.players.values()) { stopWatching(p); p.inspecting = null; p.input = { x: 0, y: 0 }; p.ai.voteAt = null; p.ai.said = 0; p.ai.replied = new Set(); }
+  for (const p of room.players.values()) { stopWatching(p); p.inspecting = null; p.input = { x: 0, y: 0 }; p.ai.voteAt = null; p.ai.said = 0; p.ai.replied = new Set(); p.ai.defended = new Set(); }
   fxAll(room, 'bell');
   broadcast(room, { t: 'meeting', caller: caller.name, report });
   for (const p of room.players.values()) if (p.bot && p.alive) botMeetingTalk(room, p);
@@ -983,7 +1050,7 @@ function tickMeeting(room) {
         for (const b of room.players.values()) if (b.bot && b.role === 'trader') for (const e of b.ai.evidence) if (e.id === out.id) e.w = 0;
       }
       if (!room.settings.reveal) text = `${out.name} اتطرد ${from}.. ومحدش عارف كان ${room.thiefMode ? 'الحرامي' : 'مزوّر'} ولا لأ`;
-      else if (room.thiefMode) text = out.role === 'thief' ? `${out.name} اتطرد.. وطلع الحرامي فعلاً! 🚔 ومعاه ${out.loot} جنيه مسروقين` : `${out.name} اتطرد.. وطلع تاجر غلبان 😢`;
+      else if (room.thiefMode) text = out.role === 'thief' ? `${out.name} اتطرد.. وطلع الحرامي فعلاً! 🚔 ومعاه ${out.loot} جنيه مسروقين` : `${out.name} اتطرد.. وطلع ${room.office ? 'موظف بريء' : 'تاجر غلبان'} 😢`;
       else if (room.office) text = out.role === 'faker' ? `${out.name} اتطرد.. وطلع القاتل فعلاً! 🚔` : `${out.name} اتطرد.. وطلع موظف بريء 😢`;
       else text = out.role === 'faker' ? `${out.name} اتطرد.. وطلع مزوّر فعلاً! 🚔` : `${out.name} اتطرد.. وطلع تاجر غلبان 😢`;
     }
@@ -1169,6 +1236,12 @@ function botMeetingTalk(room, p) {
       botSay(room, p, `أنا هصوّت على ${sus.name}`, base + 4000 + Math.random() * 3000);
     } else if (ai.cleanAt && !room.thiefMode) botSay(room, p, `كشفت على درج ال${ai.cleanAt} وكان نضيف.. ${alibi}`, base);
     else botSay(room, p, `${alibi}.. معنديش دليل لسه، ممكن سكيب`, base);
+  } else if (p.role === 'thief' && room.thiefMode && Math.random() < 0.4) {
+    // الحرامي ساعات يعمل نفسه ضحية عشان يبعد الشك
+    botSay(room, p, room.office ? `أنا كنت في ${rand(MAP.rooms.filter((r) => r.name !== 'الحسابات')).name} لما الإنذار ضرب` : `وأنا كمان اتنشلت عند بسطة ال${rand(MAP.stalls).item}! 😤`, base);
+    const others = alivePlayers(room).filter((q) => q.role !== 'thief');
+    const victim = topSuspect(room, p) || rand(others);
+    if (victim && Math.random() < 0.6) { ai.framed = victim.id; botSay(room, p, `أنا شاكك في ${victim.name}، كان بيحوم كتير`, base + 5000 + Math.random() * 4000); }
   } else {
     botSay(room, p, alibi, base);
     // المزوّر ساعات بيلبّس حد
@@ -1176,7 +1249,7 @@ function botMeetingTalk(room, p) {
     if (others.length && Math.random() < 0.4) {
       const victim = rand(others);
       ai.framed = victim.id;
-      botSay(room, p, room.thiefMode ? `بصراحة ${victim.name} كان بيلزق في الناس جنب بسطة ال${rand(MAP.stalls).item}.. شكله مريب` : room.office ? `بصراحة ${victim.name} كان بيلف لوحده في ${rand(MAP.rooms).name}.. شكله مريب` : `بصراحة ${victim.name} كان واقف كتير جنب درج ال${rand(MAP.stalls).item}.. شكله مريب`, base + 5000 + Math.random() * 4000);
+      botSay(room, p, room.thiefMode && room.office ? `بصراحة ${victim.name} كان رايح ناحية الحسابات من شوية.. شكله مريب` : room.thiefMode ? `بصراحة ${victim.name} كان بيلزق في الناس جنب بسطة ال${rand(MAP.stalls).item}.. شكله مريب` : room.office ? `بصراحة ${victim.name} كان بيلف لوحده في ${rand(MAP.rooms).name}.. شكله مريب` : `بصراحة ${victim.name} كان واقف كتير جنب درج ال${rand(MAP.stalls).item}.. شكله مريب`, base + 5000 + Math.random() * 4000);
     }
   }
 }
@@ -1191,13 +1264,19 @@ function botsHear(room, speaker, text) {
       if (q === b) {
         // اتّهموه
         if (!ACCUSE.test(text) || b.ai.replied?.has(speaker.id) || b.ai.replied?.size >= 2) continue;
+        const again = b.ai.replied?.size > 0;
         b.ai.replied?.add(speaker.id);
-        const where = b.ai.lastStall != null ? `كنت عند ال${MAP.stalls[b.ai.lastStall].item}` : 'كنت بشتري حاجتي';
-        botSay(room, b, `أنا؟! والله ${where}.. أنا مالي`, 1500 + Math.random() * 2500);
+        const where = b.ai.lastStall != null ? `كنت عند ال${MAP.stalls[b.ai.lastStall].item}` : room.office ? 'كنت بخلّص شغلي' : 'كنت بشتري حاجتي';
+        botSay(room, b, again ? `يا جماعة قلتلكم ${where}، دوّروا على حد تاني` : `أنا؟! والله ${where}.. أنا مالي`, 1500 + Math.random() * 2500);
         if (b.role === 'faker' || susOf(b, speaker) >= 1) {
           addSus(b, speaker.id, 1);
           if (Math.random() < 0.5 && !text.startsWith('وانت يا')) botSay(room, b, `وانت يا ${speaker.name} بتتهم الناس ليه؟ انت اللي مريب`, 5000 + Math.random() * 3000);
         }
+      } else if (b.role === 'trader' && ACCUSE.test(text) && b.ai.alibi?.[q.id] && !b.ai.defended?.has(q.id)) {
+        // عنده دليل إن المتهم بريء: يدافع عنه
+        (b.ai.defended ||= new Set()).add(q.id);
+        botSay(room, b, `لأ استنوا، ${b.ai.alibi[q.id]}`, 1800 + Math.random() * 2500);
+        addSus(b, speaker.id, speaker.bot ? 0.3 : 0.5);
       } else if (b.role === 'trader' && ACCUSE.test(text)) {
         // بيصدّق الاتهام شوية، أكتر لو كان شاكك أصلاً، وأقل لو الدليل ضده
         // اتهام من غير دليل بيزوّد الشك شوية بس، محتاج حاجة تانية تأكده
@@ -1240,7 +1319,7 @@ function botDecide(room, p, t) {
   if (p.role === 'trader') {
     if (!p.alive) return todo.length ? goTo(p, MAP.stalls[rand(todo)], 'use') : goTo(p, { x: 200 + Math.random() * 1400, y: 300 + Math.random() * 600 }, 'wander');
     const sus = topSuspect(room, p);
-    if (sus && susOf(p, sus) >= (room.thiefMode ? 3.5 : 4) && p.meetingsLeft > 0 && !room.blackout) return goTo(p, MAP.boss, 'use');
+    if (sus && susOf(p, sus) >= (room.thiefMode ? (room.office ? 3 : 3.5) : 4) && p.meetingsLeft > 0 && !room.blackout) return goTo(p, MAP.boss, 'use');
     // الشرطي بيروح يفتّش أكتر واحد شاكك فيه
     if (p.special === 'police' && p.searchLeft > 0 && sus && susOf(p, sus) >= 2) return goTo(p, { x: sus.x, y: sus.y }, 'search', { who: sus.id });
     if (room.office) {
@@ -1258,6 +1337,13 @@ function botDecide(room, p, t) {
     // الشحات بيقعد في القهوة أو جنب الزحمة
     if (p.special === 'watcher' && Math.random() < 0.5) return goTo(p, { x: MAP.cafe.x + MAP.cafe.w / 2, y: MAP.cafe.y + MAP.cafe.h + 30 }, 'wait');
     return goTo(p, rand(MAP.stalls), ready(p, 'inspect') && !room.thiefMode ? 'inspect' : 'wait');
+  }
+  if (p.role === 'thief' && room.office) {
+    // حرامي الشركة: يستنى الحسابات تفضى ويروح الخزنة، غير كده يعمل نفسه شغال
+    if (ready(p, 'steal') && safeClear(room, p)) return goTo(p, MAP.changer, 'crack');
+    if (Math.random() < 0.7) return goTo(p, MAP.stalls[rand(p.list)], 'use');
+    const r = rand(MAP.rooms);
+    return goTo(p, { x: r.x + r.w / 2 + (Math.random() - 0.5) * 80, y: r.y + r.h / 2 + (Math.random() - 0.5) * 60 }, 'wait');
   }
   if (p.role === 'thief') {
     // الحرامي بيدوّر على حد ماشي لوحده وفي جيبه فلوس
@@ -1311,6 +1397,31 @@ function botDecide(room, p, t) {
   if (Math.random() < 0.3) return goTo(p, rand(MAP.stalls), 'pretend');
   return goTo(p, todo.length ? MAP.stalls[rand(todo)] : rand(MAP.stalls), 'use');
 }
+// البوت اللي شاف حد بعيد عن مكان الجريمة وقتها بيبرّأه، ويقدر يدافع عنه في الاجتماع
+function clearAlibis(room, x, y, at, what) {
+  for (const b of room.players.values()) {
+    if (!b.bot || !b.alive || b.role !== 'trader') continue;
+    const seen = new Map();
+    for (const e of b.ai.seen) if (Math.abs(e.t - at) < 2.5) seen.set(e.id, e);
+    for (const [id, e] of seen) {
+      const q = room.players.get(id);
+      if (!q || q === b || Math.hypot(e.x - x, e.y - y) < 380) continue;
+      addSus(b, id, -1.2);
+      b.ai.alibi ||= {};
+      b.ai.alibi[id] = `${q.name} كان قدامي عند ${placeName(e.x, e.y)} وقت ${what}، مستحيل يكون هو`;
+    }
+  }
+}
+function safeClear(room, p) {
+  return alivePlayers(room).every((o) => o === p || o.role === 'thief' || Math.hypot(o.x - MAP.changer.x, o.y - MAP.changer.y) > CFG.vision || wallBetween(o.x, o.y, MAP.changer.x + 70, MAP.changer.y + 50));
+}
+// بعد ما يعمل عملته: يستخبى في أقرب مخبأ أو يبعد لأبعد مكان ويعمل نفسه بيشتري
+function botFlee(room, p) {
+  const hide = canHide(room, p) && (MAP.hides || []).filter((h) => Math.hypot(h.x - p.x, h.y - p.y) < 450).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+  if (hide && Math.random() < 0.75) return goTo(p, { x: hide.x, y: hide.y }, 'hide');
+  const far = [...MAP.stalls].sort((a, b) => distToRect(p.x, p.y, b) - distToRect(p.x, p.y, a))[Math.floor(Math.random() * 2)];
+  goTo(p, far, 'pretend');
+}
 function noWitness(room, p, q) {
   if (camWatchers(room, q.x, q.y, p).length) return false;
   return alivePlayers(room).every((o) => o === p || o === q || (o.role === 'faker') || Math.hypot(o.x - q.x, o.y - q.y) > CFG.vision * 0.9 || wallBetween(o.x, o.y, q.x, q.y));
@@ -1331,6 +1442,7 @@ function botAct(room, p, act) {
     case 'close': doClose(room, p); break;
     case 'power': doUse(room, p); break;
     case 'report': doReport(room, p); break;
+    case 'crack': if (safeClear(room, p)) doSteal(room, p); break;
     case 'hide': doHide(room, p); if (p.hidden != null) { ai.hops = 1 + Math.floor(Math.random() * 2); ai.hopAt = now() + 1.5; } break;
     default: break;
   }
@@ -1394,7 +1506,7 @@ function botThink(room, p, dt) {
     const d = Math.hypot(q.x - p.x, q.y - p.y);
     if (tg.act === 'plant' && d < 50) { doPlant(room, p); ai.target = null; return; }
     if (tg.act === 'search' && d < CFG.searchReach - 10) { doSearch(room, p); ai.target = null; return; }
-    if (tg.act === 'steal' && d < CFG.stealReach - 10) { doSteal(room, p); ai.target = null; return; }
+    if (tg.act === 'steal' && d < CFG.stealReach - 10) { doSteal(room, p); ai.target = null; if (!ready(p, 'steal')) botFlee(room, p); return; }
     if (tg.act === 'kill' && d < CFG.killReach - 10) {
       if (noWitness(room, p, q)) {
         doKill(room, p);
@@ -1447,10 +1559,11 @@ setInterval(() => {
         else continue;
       }
       if (p.hidden != null) continue;
+      if (room.thiefMode && room.office && p.alive && room.acc && p.x < room.acc.x + room.acc.w && p.y > room.acc.y) p.inAcc = t;
       const { x: ix, y: iy } = p.input;
       if (p.inspecting) {
-        if (ix || iy) { toast(p, p.inspecting.task ? 'اتحركت فالشغلانة اتلغت' : 'اتحركت فالكشف اتلغى'); p.inspecting = null; }
-        else if (t >= p.inspecting.until) (p.inspecting.task ? finishTask : finishInspect)(room, p);
+        if (ix || iy) { toast(p, p.inspecting.safe ? 'اتحركت فسبت الخزنة' : p.inspecting.task ? 'اتحركت فالشغلانة اتلغت' : 'اتحركت فالكشف اتلغى'); p.inspecting = null; }
+        else if (t >= p.inspecting.until) (p.inspecting.safe ? finishSafe : p.inspecting.task ? finishTask : finishInspect)(room, p);
       }
       if (!ix && !iy) continue;
       if (ix) p.face = ix > 0 ? 1 : -1;
@@ -1475,11 +1588,11 @@ setInterval(() => {
       if (!p.ws) continue;
       const faker = p.role === 'faker';
       send(p, {
-        t: 's', ps: pub.filter((q) => (q.a || !p.alive || q.id === p.id) && (!q.hd || q.id === p.id || (faker && room.players.get(q.id)?.role === 'faker'))), circ, target: room.thiefMode ? room.thiefGoal : room.target, prog, bo, cl, bodies, cw,
+        t: 's', ps: pub.filter((q) => (q.a || !p.alive || q.id === p.id) && (!q.hd || q.id === p.id || ((faker || p.role === 'thief') && room.players.get(q.id)?.role === p.role))), circ, target: room.thiefMode ? room.thiefGoal : room.target, prog, bo, cl, bodies, cw,
         me: {
           coins: p.wallet.length, fakes: faker ? p.wallet.filter(Boolean).length : undefined,
           list: p.list, bought: p.bought, alive: p.alive, meetings: p.meetingsLeft, search: p.searchLeft, hidden: p.hidden ?? null, loot: p.role === 'thief' ? p.loot : undefined,
-          insp: p.inspecting ? Math.max(0, p.inspecting.until - t) : 0, inspT: p.inspecting ? (p.inspecting.total || CFG.inspectTime) : 0, task: !!(p.inspecting && p.inspecting.task),
+          insp: p.inspecting ? Math.max(0, p.inspecting.until - t) : 0, inspT: p.inspecting ? (p.inspecting.total || CFG.inspectTime) : 0, task: !!(p.inspecting && p.inspecting.task), safe: !!(p.inspecting && p.inspecting.safe),
           cd: {
             print: cdLeft(p, 'print'), plant: cdLeft(p, 'plant'), inspect: cdLeft(p, 'inspect'), changer: cdLeft(p, 'changer'),
             blackout: faker ? Math.max(0, Math.ceil(room.blackoutReady - t)) : 0, close: cdLeft(p, 'close'), steal: cdLeft(p, 'steal'), kill: room.night && faker ? cdLeft(p, 'kill') : 0, cams: p.special === 'guard' ? cdLeft(p, 'cams') : 0,
@@ -1531,7 +1644,7 @@ wss.on('connection', (ws) => {
         if (room.phase === 'ended') return send(me, room.lastEnd);
         send(me, { ...startPayload(room, me), rejoin: true });
         if (room.phase === 'meeting') { send(me, { t: 'meeting', caller: room.meeting.caller }); meetingState(room); }
-        broadcast(room, { t: 'toast', text: `🔌 ${me.name} رجع للسوق`, kind: 'info' });
+        broadcast(room, { t: 'toast', text: `🔌 ${me.name} رجع ${MAP.theme === 'office' ? 'للشركة' : 'للسوق'}`, kind: 'info' });
         return;
       }
       if (m.t === 'create') room = createRoom(m.public);
@@ -1568,7 +1681,7 @@ wss.on('connection', (ws) => {
             reveal: !!s.reveal,
             specials: !!s.specials,
             thief: !!s.thief,
-            map: s.mode === 'office' ? 'office' : MAPS[s.map] && s.map !== 'office' ? s.map : 'souq',
+            map: s.mode === 'office' ? 'office' : MAPS[s.map] && (s.map !== 'office' || s.mode === 'thief') ? s.map : 'souq',
             mode: ['night', 'office', 'thief'].includes(s.mode) ? s.mode : 'classic',
           };
           if ('public' in s) room.public = !!s.public;
